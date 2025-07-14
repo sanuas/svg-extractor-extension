@@ -3,12 +3,13 @@ document.getElementById('extractBtn').addEventListener('click', extractSVGs);
 async function extractSVGs() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
 
+  // Step 1: Run script in page context to collect initial info
   chrome.scripting.executeScript({
     target: { tabId: tab.id },
     func: () => {
       const results = [];
 
-      // Priority 1: SVGs inside <lottie-player> shadow DOM
+      // 1. Lottie SVGs
       document.querySelectorAll('lottie-player').forEach((player, pIndex) => {
         const shadowRoot = player.shadowRoot;
         if (!shadowRoot) return;
@@ -22,9 +23,9 @@ async function extractSVGs() {
         });
       });
 
-      // Priority 2: All other SVGs (outside lottie-player)
+      // 2. Inline SVGs (not inside lottie-player)
       document.querySelectorAll('svg').forEach((svg, i) => {
-        if (svg.closest('lottie-player')) return; // skip duplicates
+        if (svg.closest('lottie-player')) return;
         results.push({
           html: svg.outerHTML,
           source: 'Page SVG',
@@ -32,33 +33,59 @@ async function extractSVGs() {
         });
       });
 
-      return results;
+      // 3. <img src="...svg"> - just collect URLs here
+      const externalSVGs = Array.from(document.querySelectorAll('img[src$=".svg"]')).map((img, i) => ({
+        src: img.src,
+        source: 'Image Tag (External)',
+        index: `I${i + 1}`
+      }));
+
+      return { results, externalSVGs };
     }
-  }, (results) => {
+  }, async ([injectedResult]) => {
     const svgList = document.getElementById('svgList');
     svgList.innerHTML = '';
 
-    const allSVGs = results?.[0]?.result || [];
+    const { results = [], externalSVGs = [] } = injectedResult?.result || {};
 
-    if (allSVGs.length === 0) {
+    // Step 2: Fetch external SVGs
+    for (let img of externalSVGs) {
+      try {
+        const res = await fetch(img.src);
+        const text = await res.text();
+        if (text.includes('<svg')) {
+          results.push({
+            html: text,
+            source: img.source,
+            index: img.index
+          });
+        }
+      } catch (err) {
+        results.push({
+          html: `<small>⚠️ Failed to fetch: ${img.src}</small>`,
+          source: img.source,
+          index: img.index
+        });
+      }
+    }
+
+    if (results.length === 0) {
       svgList.textContent = 'No SVGs found on this page.';
       return;
     }
 
-    allSVGs.forEach((item) => {
+    // Step 3: Render all
+    results.forEach((item) => {
       const wrapper = document.createElement('div');
       wrapper.className = 'svg-item';
 
-      // Label (Source and ID)
       const label = document.createElement('div');
       label.innerHTML = `<strong>${item.source}</strong> — ID: ${item.index}`;
 
-      // SVG Preview
       const preview = document.createElement('div');
       preview.className = 'svg-preview';
       preview.innerHTML = item.html;
 
-      // Download Button
       const downloadBtn = document.createElement('button');
       downloadBtn.textContent = `Download SVG ${item.index}`;
       downloadBtn.addEventListener('click', () => {

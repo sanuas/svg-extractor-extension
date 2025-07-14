@@ -3,7 +3,12 @@
   "name": "SVG Extractor",
   "version": "1.0",
   "description": "Extract and download SVGs from Lottie players and other web pages. Developed by ITS - Info Twist Solutions (its.net.in).",
-  "permissions": ["scripting", "activeTab"],
+  "permissions": [
+    "scripting","activeTab"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
   "action": {
     "default_popup": "popup.html",
     "default_icon": {
