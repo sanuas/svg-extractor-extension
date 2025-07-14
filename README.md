@@ -1,6 +1,6 @@
 # SVG Extractor Extension
 
-A simple and efficient Google Chrome extension to list and download all SVG's from the current web page.
+A simple and efficient Google Chrome extension to list and download all SVG's from the current web page especialy `<lottie-player>`.
 
 ---
 
